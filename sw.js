@@ -1,4 +1,4 @@
-const CACHE = "bayinat-v2";
+const CACHE = "bayinat-v3";
 const SHELL = [
   "./",
   "./index.html",
@@ -40,6 +40,20 @@ self.addEventListener("fetch", e => {
   }
 
   if (new URL(req.url).origin !== location.origin) return;
+
+  // الصفحة نفسها: من الشبكة أولًا حتى تصل التحديثات فورًا،
+  // ومن الذاكرة عند انقطاع الاتصال فقط.
+  const isPage = req.mode === "navigate" || req.destination === "document";
+  if (isPage) {
+    e.respondWith(
+      fetch(req).then(res => {
+        const copy = res.clone();
+        caches.open(CACHE).then(c => c.put("./index.html", copy));
+        return res;
+      }).catch(() => caches.match("./index.html"))
+    );
+    return;
+  }
 
   e.respondWith(
     caches.match(req).then(hit => hit || fetch(req).then(res => {

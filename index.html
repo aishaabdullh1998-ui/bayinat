@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="بيّنات">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@400;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Playfair+Display:wght@500;600&family=Reem+Kufi:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <style>
   :root{
@@ -34,6 +34,8 @@
     --gold-soft:#F3E7CC;
     --danger:#A33C2E;
     --danger-soft:#F4DFDA;
+    --leaf:#41513C;
+    --leaf-op:.26;
     --shadow-sm:0 1px 2px rgba(60,32,22,.06);
     --shadow:0 2px 6px rgba(60,32,22,.06), 0 14px 34px -20px rgba(60,32,22,.34);
     --shadow-lg:0 6px 14px rgba(60,32,22,.09), 0 26px 50px -24px rgba(60,32,22,.44);
@@ -45,7 +47,9 @@
       --brand:#C9694D; --brand-deep:#7C3A2A; --brand-tint:#3A231B; --on-brand:#F7E9E2;
       --ink:#F4E4DB; --ink-soft:#C2AA9E; --ink-faint:#93796C; --line:#482E24;
       --blue:#77B4D4; --blue-soft:#21343E; --gold:#DCAE5C; --gold-soft:#3A301C;
-      --danger:#E08874; --danger-soft:#3E241E;
+      --danger:#E08874; --leaf:#8CA37F;
+      --leaf-op:.19;
+      --danger-soft:#3E241E;
       --shadow-sm:0 1px 2px rgba(0,0,0,.4);
       --shadow:0 2px 6px rgba(0,0,0,.34), 0 16px 36px -22px rgba(0,0,0,.8);
       --shadow-lg:0 8px 18px rgba(0,0,0,.4), 0 30px 60px -28px rgba(0,0,0,.9);
@@ -56,11 +60,21 @@
     --brand:#C9694D; --brand-deep:#7C3A2A; --brand-tint:#3A231B; --on-brand:#F7E9E2;
     --ink:#F4E4DB; --ink-soft:#C2AA9E; --ink-faint:#93796C; --line:#482E24;
     --blue:#77B4D4; --blue-soft:#21343E; --gold:#DCAE5C; --gold-soft:#3A301C;
-    --danger:#E08874; --danger-soft:#3E241E;
+    --danger:#E08874; --leaf:#8CA37F;
+    --leaf-op:.19;
+    --danger-soft:#3E241E;
     --shadow-sm:0 1px 2px rgba(0,0,0,.4);
     --shadow:0 2px 6px rgba(0,0,0,.34), 0 16px 36px -22px rgba(0,0,0,.8);
     --shadow-lg:0 8px 18px rgba(0,0,0,.4), 0 30px 60px -28px rgba(0,0,0,.9);
   }
+
+  /* ── عناصر نباتية في الخلفية ─────────────────────── */
+  .botanic{position:fixed;z-index:-1;pointer-events:none;color:var(--leaf);opacity:var(--leaf-op);}
+  .botanic-a{top:32vh;inset-inline-start:-38px;transform:rotate(-10deg);}
+  .botanic-b{bottom:2vh;inset-inline-end:-70px;transform:scaleX(-1) rotate(-6deg);}
+  .botanic-c{top:66vh;inset-inline-end:-88px;transform:scaleY(-1) rotate(10deg);}
+  .lock .botanic{position:absolute;z-index:0;color:#F7E9E2;opacity:.14;}
+  @media (max-width:760px){ .botanic-a,.botanic-c{display:none;} .botanic-b{opacity:calc(var(--leaf-op) * .7);} }
 
   *{box-sizing:border-box;}
   html,body{direction:rtl;}
@@ -98,20 +112,19 @@
     background:var(--surface);border-radius:16px;padding:34px 28px 28px;box-shadow:var(--shadow-lg);
     animation:sheetIn .5s var(--ease) both;
   }
-  .lock-card .wm{font-family:"Amiri",serif;font-weight:700;font-size:3rem;color:var(--brand);line-height:1;}
+  .lock-card .wm{font-family:"Reem Kufi","Aref Ruqaa",serif;font-weight:500;font-size:2.7rem;color:var(--brand);line-height:1;}
   .lock-card .wl{font-family:"Playfair Display",serif;font-size:1.15rem;color:var(--ink-faint);letter-spacing:.06em;margin-bottom:6px;}
   .lock-card p{color:var(--ink-soft);font-size:14px;margin:8px 0 20px;}
-  .lock-card input[type="text"],.lock-card input[type="password"]{
-    width:100%;text-align:center;letter-spacing:.08em;font-size:17px;
+  .lock-card input{
+    width:100%;text-align:center;letter-spacing:.06em;font-size:16.5px;
+    font-family:inherit;
     border:1px solid var(--line);background:var(--ground);color:var(--ink);
-    border-radius:10px;padding:12px;margin-bottom:10px;
+    border-radius:10px;padding:13px 12px;margin-bottom:10px;
+    -webkit-appearance:none;appearance:none;
+    transition:border-color .2s, box-shadow .2s, background .2s;
   }
-  .lock-card input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-soft);}
-  .lock-card .remember{
-    display:flex;align-items:center;justify-content:center;gap:8px;
-    font-size:13px;color:var(--ink-soft);margin:2px 0 10px;cursor:pointer;
-  }
-  .lock-card .remember input{width:16px;height:16px;accent-color:var(--brand);margin:0;}
+  .lock-card input::placeholder{color:var(--ink-faint);letter-spacing:0;}
+  .lock-card input:focus{outline:none;border-color:var(--blue);background:var(--surface);box-shadow:0 0 0 3px var(--blue-soft);}
   .lock-err{color:var(--danger);font-size:13.5px;min-height:20px;margin-bottom:6px;}
   .lock-hint{font-size:12px;color:var(--ink-faint);margin-top:14px;line-height:1.6;}
   .linkish{background:none;border:none;color:var(--brand);cursor:pointer;font-size:12.5px;text-decoration:underline;padding:0;}
@@ -124,7 +137,7 @@
     transform:translateY(-105%);transition:transform .4s var(--ease);
   }
   .minibar.show{transform:translateY(0);}
-  .minibar .mb-brand{font-family:"Amiri",serif;font-size:22px;font-weight:700;color:var(--brand);line-height:1;}
+  .minibar .mb-brand{font-family:"Reem Kufi",serif;font-size:21px;font-weight:600;color:var(--brand);line-height:1;}
   .minibar .mb-meta{font-size:13px;color:var(--ink-soft);}
   .mb-cta{
     background:var(--brand);color:var(--on-brand);border:none;border-radius:8px;
@@ -145,16 +158,22 @@
     background-image:radial-gradient(rgba(255,255,255,.07) 1px, transparent 1px);background-size:5px 5px;opacity:.55;
   }
   .hero-inner{position:relative;z-index:1;max-width:760px;margin:0 auto;}
-  .wordmark-ar{font-family:"Amiri",serif;font-weight:700;line-height:1;font-size:clamp(3.2rem,12vw,5.6rem);}
-  .wordmark-lat{font-family:"Playfair Display",serif;font-weight:500;font-size:clamp(1.4rem,5vw,2.4rem);letter-spacing:.06em;margin-top:-.12em;opacity:.94;}
-  .hero-line{display:flex;align-items:center;gap:16px;margin-top:24px;font-size:clamp(12px,2.6vw,14.5px);letter-spacing:.16em;opacity:.82;}
+  .wordmark-ar{
+    font-family:"Reem Kufi","Aref Ruqaa",serif;font-weight:500;line-height:1.25;
+    font-size:clamp(2.9rem,11vw,5rem);letter-spacing:0;margin:0;
+  }
+  .wordmark-lat{font-family:"Playfair Display",serif;font-weight:500;font-size:clamp(1.4rem,5vw,2.4rem);letter-spacing:.04em;margin-top:-.18em;opacity:.95;}
+  .hero-line{
+    display:flex;align-items:center;gap:18px;margin-top:22px;
+    font-family:"Aref Ruqaa",serif;font-size:clamp(15px,3.4vw,20px);letter-spacing:0;opacity:.9;
+  }
   .hero-line::before,.hero-line::after{content:"";flex:1;height:1px;background:currentColor;opacity:.45;}
   .diamond-band{display:flex;justify-content:center;gap:16px;margin-top:26px;overflow:hidden;}
   .diamond-band svg{flex:none;opacity:.75;}
   .diamond-band svg:nth-child(even){opacity:.4;}
 
   .hadith{background:var(--surface-2);border-bottom:1px solid var(--line);padding:clamp(24px,5vw,40px) 20px;text-align:center;}
-  .hadith q{display:block;font-family:"Amiri",serif;font-size:clamp(1.2rem,3.6vw,1.8rem);line-height:1.9;color:var(--ink);quotes:"«" "»";}
+  .hadith q{display:block;font-family:"Aref Ruqaa",serif;font-size:clamp(1.1rem,3.2vw,1.6rem);line-height:2.15;color:var(--ink);quotes:"«" "»";}
   .hadith .attrib{display:inline-flex;align-items:center;gap:10px;margin-top:8px;font-size:13px;color:var(--ink-soft);}
   .hadith .attrib::before,.hadith .attrib::after{content:"";width:26px;height:1px;background:var(--line);}
 
@@ -335,7 +354,7 @@
     background:radial-gradient(120% 95% at 32% 18%, #934A35 0%, #7C3A2A 42%, #55241A 100%);
     color:var(--on-brand);border-radius:14px;padding:26px 24px;text-align:center;margin-bottom:20px;
   }
-  .rep-head .wm{font-family:"Amiri",serif;font-weight:700;font-size:2.6rem;line-height:1;}
+  .rep-head .wm{font-family:"Reem Kufi",serif;font-weight:500;font-size:2.4rem;line-height:1;}
   .rep-head .wl{font-family:"Playfair Display",serif;font-size:1rem;letter-spacing:.08em;opacity:.9;}
   .rep-head .sch{margin-top:10px;font-size:13px;letter-spacing:.12em;opacity:.85;}
   .rep-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px;margin-bottom:16px;box-shadow:var(--shadow-sm);}
@@ -376,6 +395,8 @@
   footer .school{color:var(--ink);font-weight:600;font-size:14.5px;}
   footer .credit{margin-top:6px;}
   footer .credit b{color:var(--brand);font-weight:600;}
+  footer .logout{margin-top:20px;background:transparent;border:1px solid var(--line);}
+  footer .logout:hover{background:var(--danger-soft);color:var(--danger);border-color:var(--danger);}
 
   @media (max-width:760px){ .stats{grid-template-columns:repeat(2,1fr);} }
   @media (max-width:560px){
@@ -399,19 +420,17 @@
 <body>
 
 <!-- شاشة القفل -->
-<div class="lock" id="lockView" hidden>
+<div class="lock" id="lockView">
+  <div class="botanic botanic-a" data-branch="1" aria-hidden="true"></div>
+  <div class="botanic botanic-b" data-branch="1" aria-hidden="true"></div>
   <div class="lock-card">
-    <div class="wm">بيّنات</div>
+    <div class="wm">بيّـــنات</div>
     <div class="wl">Bayinat</div>
-    <p>تسجيل دخول المعلم</p>
-    <input id="userInput" type="email" autocomplete="username" placeholder="البريد الإلكتروني" dir="ltr">
-    <input id="passInput" type="password" autocomplete="current-password" placeholder="كلمة المرور" dir="ltr">
-    <div class="lock-err" id="lockErr"></div>
+    <p>تسجيل الدخول</p>
+    <input id="userInput" type="email" autocomplete="username" placeholder="البريد الإلكتروني" aria-label="البريد الإلكتروني" dir="ltr">
+    <input id="passInput" type="password" autocomplete="current-password" placeholder="كلمة المرور" aria-label="كلمة المرور" dir="ltr">
+    <div class="lock-err" id="lockErr" role="alert"></div>
     <button class="btn" id="lockBtn" style="width:100%">دخول</button>
-    <div class="lock-hint">
-      حساب المعلمة يتحقّق منه الخادم، وبيانات الطلاب مشتركة بين جميع الأجهزة.<br>
-      ولي الأمر يدخل عبر رابط المتابعة الخاص بابنه دون تسجيل دخول.
-    </div>
   </div>
 </div>
 
@@ -423,9 +442,9 @@
 
 <header class="hero">
   <div class="hero-inner">
-    <div class="wordmark-ar anim" style="animation-delay:.05s">بيّنات</div>
+    <h1 class="wordmark-ar anim" style="animation-delay:.05s">بيّـــنات</h1>
     <div class="wordmark-lat anim" style="animation-delay:.16s">Bayinat</div>
-    <div class="hero-line anim" style="animation-delay:.28s"><span>مدرسة الصلاح</span><span>للتعليم الأساسي</span></div>
+    <div class="hero-line anim" style="animation-delay:.28s"><span>مدرسة الصلاح للتعليم الأساسي</span></div>
     <div class="diamond-band anim" id="heroDiamonds" style="animation-delay:.4s"></div>
   </div>
 </header>
@@ -439,7 +458,7 @@
 
   <section class="stats">
     <div class="stat anim" style="animation-delay:.62s"><b id="statCount">٠</b><span>طالب مسجَّل</span></div>
-    <div class="stat anim" style="animation-delay:.66s"><b id="statSurahs">٠</b><span>سورة أُتمّت</span></div>
+    <div class="stat anim" style="animation-delay:.66s"><b id="statSurahs">٠</b><span>سورة مُنجزة</span></div>
     <div class="stat anim" style="animation-delay:.7s"><b id="statAvg">٠٪</b><span>متوسط الإنجاز</span></div>
     <div class="stat warn anim" style="animation-delay:.74s"><b id="statStale">٠</b><span>يحتاج متابعة</span></div>
   </section>
@@ -447,12 +466,11 @@
   <div class="toolbar anim" style="animation-delay:.78s">
     <button class="tool" id="btnBackup" type="button">⬇ نسخة احتياطية</button>
     <button class="tool" id="btnRestore" type="button">⬆ استيراد نسخة</button>
-    <input type="file" id="fileInput" accept="application/json,.json" hidden>
+    <input type="file" id="fileInput" aria-label="ملف النسخة الاحتياطية" accept="application/json,.json" hidden>
     <button class="tool" id="btnInstall" type="button" hidden>⤓ تثبيت التطبيق</button>
     <span class="tool spacer"></span>
     <span class="tool" id="syncBadge" style="cursor:default">◍ …</span>
     <button class="tool" id="btnTheme" type="button">◐ المظهر: تلقائي</button>
-    <button class="tool" id="btnLock" type="button">⌾ تسجيل خروج</button>
   </div>
 
   <section class="panel anim" style="animation-delay:.82s" id="addPanel">
@@ -475,8 +493,8 @@
 
   <section class="panel" id="listPanel" hidden>
     <div class="search-row">
-      <input id="searchInput" type="text" placeholder="ابحث باسم الطالب...">
-      <select id="sortSelect">
+      <input id="searchInput" type="text" placeholder="البحث باسم الطالب..." aria-label="البحث باسم الطالب">
+      <select id="sortSelect" aria-label="ترتيب الطلاب">
         <option value="created">ترتيب: الأقدم إضافة</option>
         <option value="name">ترتيب: الاسم</option>
         <option value="progress">ترتيب: الأعلى إنجازًا</option>
@@ -495,7 +513,7 @@
   <div class="empty" id="emptyState" hidden>
     <svg class="em-mark" width="46" height="46" viewBox="0 0 42 42" aria-hidden="true"></svg>
     <h3>لا يوجد طلاب بعد</h3>
-    <p>أضف أول طالب من النموذج أعلاه لبدء متابعة تسميعه.</p>
+    <p>أضيفي أول طالب من النموذج أعلاه لبدء متابعة تسميعه.</p>
   </div>
 
 </main>
@@ -503,9 +521,14 @@
 <footer>
   <div class="fdiamonds" id="footerDiamonds"></div>
   <div class="school">مدرسة الصلاح للتعليم الأساسي</div>
-  <div>منصة بيّنات لمتابعة التسميع — تُحفظ البيانات في هذا الجهاز</div>
+  <div>منصة بيّنات لمتابعة التسميع — البيانات محفوظة ومشتركة بين أجهزة المعلمات</div>
   <div class="credit">تصميم: <b>أ. عائشة البروانية</b></div>
+  <button class="tool logout" id="btnLock" type="button">⌾ تسجيل الخروج</button>
 </footer>
+
+<div class="botanic botanic-a" data-branch="1" aria-hidden="true"></div>
+<div class="botanic botanic-b" data-branch="1" aria-hidden="true"></div>
+<div class="botanic botanic-c" data-branch="1" aria-hidden="true"></div>
 
 <script>
 (function(){
@@ -568,6 +591,47 @@
   document.querySelectorAll(".panel-head .tag, .empty .em-mark").forEach(s=>paintDiamond(s,"var(--brand)"));
 
   const STAR='<svg width="11" height="11" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8L12 15l-5.3 2.6 1-5.8L3.5 7.7l5.9-.9z" fill="currentColor"/></svg>';
+
+  /* ─── أغصان نباتية للخلفية ─────────────────────── */
+  function branchSVG(){
+    const svg=document.createElementNS(NS,"svg");
+    svg.setAttribute("viewBox","0 0 230 150");
+    svg.setAttribute("width","300"); svg.setAttribute("height","196");
+    svg.setAttribute("aria-hidden","true");
+    const P0={x:6,y:142}, P1={x:96,y:6}, P2={x:224,y:52};
+    const at=t=>({
+      x:(1-t)*(1-t)*P0.x+2*(1-t)*t*P1.x+t*t*P2.x,
+      y:(1-t)*(1-t)*P0.y+2*(1-t)*t*P1.y+t*t*P2.y,
+      a:Math.atan2(2*(1-t)*(P1.y-P0.y)+2*t*(P2.y-P1.y),
+                   2*(1-t)*(P1.x-P0.x)+2*t*(P2.x-P1.x))*180/Math.PI
+    });
+    const stem=document.createElementNS(NS,"path");
+    stem.setAttribute("d","M"+P0.x+","+P0.y+" Q"+P1.x+","+P1.y+" "+P2.x+","+P2.y);
+    stem.setAttribute("fill","none");
+    stem.setAttribute("stroke","currentColor");
+    stem.setAttribute("stroke-width","2.4");
+    stem.setAttribute("stroke-linecap","round");
+    svg.appendChild(stem);
+    for(let i=1;i<=11;i++){
+      const t=i/12, p=at(t), grow=Math.sin(t*Math.PI)*0.55+0.6;
+      [-1,1].forEach((side,k)=>{
+        if((i+k)%2) return;
+        const L=17*grow, W=7.4*grow;
+        const leaf=document.createElementNS(NS,"path");
+        leaf.setAttribute("d","M0,0 C"+(L*0.35)+","+(-W)+" "+(L*0.8)+","+(-W*0.8)+" "+L+",0 C"+(L*0.8)+","+(W*0.8)+" "+(L*0.35)+","+W+" 0,0 Z");
+        leaf.setAttribute("fill","currentColor");
+        leaf.setAttribute("transform","translate("+p.x+","+p.y+") rotate("+(p.a+side*46)+")");
+        svg.appendChild(leaf);
+      });
+    }
+    const tip=at(1);
+    const bud=document.createElementNS(NS,"circle");
+    bud.setAttribute("cx",tip.x); bud.setAttribute("cy",tip.y);
+    bud.setAttribute("r","3.4"); bud.setAttribute("fill","currentColor");
+    svg.appendChild(bud);
+    return svg;
+  }
+  document.querySelectorAll("[data-branch]").forEach(n=>n.appendChild(branchSVG()));
 
   /* ═══ التخزين ════════════════════════════════════ */
   const KEY="bayinat_v2", OLD_KEYS=["bayinat_students","tibyan_students"];
@@ -662,12 +726,15 @@
       const {data,error}=await sb.from("students").select("*");
       if(error || !data) return;
       const localOnly = state.students.slice();
-      if(data.length===0 && localOnly.length>0){
+      const migrated = localStorage.getItem("bayinat_migrated")==="1";
+      if(data.length===0 && localOnly.length>0 && !migrated){
         localOnly.forEach(s=>{ queue.push({op:"up", id:s.id, row:rowOf(s)}); });
-        saveQueue(); await flush();
+        saveQueue(); localStorage.setItem("bayinat_migrated","1");
+        await flush();
         toast("رُفعت بيانات هذا الجهاز إلى السحابة");
         return;
       }
+      localStorage.setItem("bayinat_migrated","1");
       state.students = data.map(fromRow);
       save(); render();
     }catch(e){}
@@ -687,6 +754,7 @@
     const el=document.getElementById("syncBadge");
     if(!el) return;
     if(!sb){ el.textContent="◍ محلي فقط"; el.title="تعذّر تحميل مكتبة المزامنة"; return; }
+    if(!authed){ el.textContent="◍ غير مسجّلة الدخول"; el.title="سجّلي الدخول لمزامنة البيانات"; return; }
     if(!navigator.onLine){ el.textContent="◍ دون اتصال"+(queue.length?" ("+ed(queue.length)+")":""); el.title="ستُرفع التغييرات عند عودة الاتصال"; return; }
     if(queue.length){ el.textContent="◍ جارٍ الرفع ("+ed(queue.length)+")"; el.title="تغييرات بانتظار الرفع"; return; }
     el.textContent="◉ متزامن"; el.title="كل التغييرات محفوظة في السحابة";
@@ -739,7 +807,7 @@
   async function submitLock(){
     const email=userInput.value.trim();
     const pass=toLatinDigits(passInput.value.trim());
-    if(!email || !pass){ lockErr.textContent="أدخل البريد وكلمة المرور"; return; }
+    if(!email || !pass){ lockErr.textContent="أدخلي البريد وكلمة المرور"; return; }
 
     if(!sb){
       /* دون اتصال أو تعذّر تحميل المكتبة: يُسمح بالعمل محليًا لمن سبق له الدخول */
@@ -757,7 +825,7 @@
     try{
       const {error}=await sb.auth.signInWithPassword({email, password:pass});
       if(error) throw error;
-      toast("مرحبًا بك في بيّنات");
+      toast("مرحبًا بكِ في بيّنات");
       await afterSignIn();
     }catch(e){
       const msg=String((e&&e.message)||"");
@@ -820,6 +888,7 @@
   const counters={};
   function countTo(el,key,target,suffix){
     const from=counters[key]||0; counters[key]=target;
+    if(target===0){ el.textContent="—"; return; }
     if(from===target){ el.textContent=ed(target)+(suffix||""); return; }
     const t0=performance.now();
     (function step(now){
@@ -872,7 +941,7 @@
         '</div>'+
         '<div class="field" style="margin-bottom:12px"><label for="dlgDate">تاريخ التسميع</label>'+
           '<input id="dlgDate" type="date" value="'+((cur&&cur.date)||todayISO())+'"></div>'+
-        '<div class="field"><label for="dlgNote">ملاحظة المعلم (اختياري)</label>'+
+        '<div class="field"><label for="dlgNote">ملاحظة المعلمة (اختياري)</label>'+
           '<textarea id="dlgNote" rows="2" maxlength="140" placeholder="مثال: يراجع أواخر الآيات">'+esc((cur&&cur.note)||"")+'</textarea></div>'+
         '<div class="sheet-actions">'+
           '<button type="button" class="btn" id="dlgSave">حفظ التسميع</button>'+
@@ -1012,7 +1081,7 @@
           '<div class="rep-title"><h2 style="font-size:17px">سجل التسميع</h2></div>'+
           '<table class="rep"><thead><tr><th>#</th><th>السورة</th><th>التاريخ</th><th>التقييم والملاحظة</th></tr></thead>'+
           '<tbody>'+rows+'</tbody></table>'+
-          '<div class="sign-row"><div class="sign">توقيع المعلم</div><div class="sign">توقيع ولي الأمر</div></div>'+
+          '<div class="sign-row"><div class="sign">توقيع المعلمة</div><div class="sign">توقيع ولي الأمر</div></div>'+
         '</div>'+
         '<p style="text-align:center;font-size:12px;color:var(--ink-faint)">منصة بيّنات — تصميم: أ. عائشة البروانية</p>'+
       '</div>';
@@ -1239,7 +1308,7 @@
     if(filtered.length===0){
       const d=document.createElement("div");
       d.className="empty"; d.style.gridColumn="1/-1";
-      d.innerHTML="<h3>لا توجد نتائج</h3><p>لم يتم العثور على طالب بهذا الاسم.</p>";
+      d.innerHTML="<h3>لا توجد نتائج</h3><p>لم نعثر على طالب بهذا الاسم.</p>";
       grid.appendChild(d); return;
     }
     filtered.forEach((s,i)=>grid.appendChild(renderCard(s,i)));
@@ -1272,7 +1341,7 @@
       openSheet((sheet,close)=>{
         sheet.innerHTML=
           '<h3>استيراد نسخة احتياطية</h3>'+
-          '<div class="sub">الملف يحتوي على '+ed(incoming.length)+' طالب. اختر طريقة الاستيراد.</div>'+
+          '<div class="sub">الملف يحتوي على '+ed(incoming.length)+' طالب. اختاري طريقة الاستيراد.</div>'+
           '<div class="sheet-actions">'+
             '<button type="button" class="btn" id="impMerge">دمج مع الحالي</button>'+
             '<button type="button" class="btn ghost" id="impReplace">استبدال الكل</button>'+
@@ -1360,6 +1429,7 @@
     let data=null;
     try{ data=decodePayload(hash0.slice(3)); }catch(e){}
     if(data){
+      hideLock();
       document.body.style.overflow="hidden";
       renderReport({name:data.n,juz:data.j,records:data.r||{},reportDate:data.t},{parent:true});
     } else {
