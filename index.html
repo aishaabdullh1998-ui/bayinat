@@ -14,6 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <style>
   :root{
     --ground:#F6E7E0;
@@ -403,13 +404,12 @@
     <div class="wm">بيّنات</div>
     <div class="wl">Bayinat</div>
     <p>تسجيل دخول المعلم</p>
-    <input id="userInput" type="text" autocomplete="username" placeholder="اسم المستخدم" dir="ltr">
+    <input id="userInput" type="email" autocomplete="username" placeholder="البريد الإلكتروني" dir="ltr">
     <input id="passInput" type="password" autocomplete="current-password" placeholder="كلمة المرور" dir="ltr">
-    <label class="remember"><input type="checkbox" id="rememberMe"> تذكّرني على هذا الجهاز</label>
     <div class="lock-err" id="lockErr"></div>
     <button class="btn" id="lockBtn" style="width:100%">دخول</button>
     <div class="lock-hint">
-      هذه الواجهة للمعلمين فقط، والبيانات محفوظة على هذا الجهاز ولا تُرسل لأي خادم.<br>
+      حساب المعلمة يتحقّق منه الخادم، وبيانات الطلاب مشتركة بين جميع الأجهزة.<br>
       ولي الأمر يدخل عبر رابط المتابعة الخاص بابنه دون تسجيل دخول.
     </div>
   </div>
@@ -450,6 +450,7 @@
     <input type="file" id="fileInput" accept="application/json,.json" hidden>
     <button class="tool" id="btnInstall" type="button" hidden>⤓ تثبيت التطبيق</button>
     <span class="tool spacer"></span>
+    <span class="tool" id="syncBadge" style="cursor:default">◍ …</span>
     <button class="tool" id="btnTheme" type="button">◐ المظهر: تلقائي</button>
     <button class="tool" id="btnLock" type="button">⌾ تسجيل خروج</button>
   </div>
@@ -596,6 +597,104 @@
   }
   const save = () => { try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} };
 
+  /* ═══ المزامنة السحابية ══════════════════════════ */
+  const SUPA_URL = "https://usgcxyauupqkctqxmoyx.supabase.co";
+  const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVzZ2N4eWF1dXBxa2N0cXhtb3l4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg4Nzk2MTQsImV4cCI6MjEwNDQ1NTYxNH0.8Tf0PwduBAsAlrB7XLH4Pk5vUwsnyFSNaLzWFUgi6ZA";
+
+  const QKEY="bayinat_queue";
+  let sb=null, authed=false, syncing=false;
+  let queue=[];
+  try{ queue = JSON.parse(localStorage.getItem(QKEY)||"[]"); }catch(e){ queue=[]; }
+  const saveQueue = () => { try{ localStorage.setItem(QKEY, JSON.stringify(queue)); }catch(e){} };
+
+  try{
+    if(window.supabase && window.supabase.createClient)
+      sb = window.supabase.createClient(SUPA_URL, SUPA_KEY);
+  }catch(e){ sb=null; }
+
+  const rowOf = s => ({
+    id:s.id, name:s.name, juz:Number(s.juz)||30, records:s.records||{},
+    created_at:new Date(s.createdAt||Date.now()).toISOString(),
+    updated_at:new Date().toISOString()
+  });
+  const fromRow = r => ({
+    id:r.id, name:r.name, juz:Number(r.juz)||30, records:r.records||{},
+    createdAt: r.created_at ? Date.parse(r.created_at) : Date.now()
+  });
+
+  /* يحفظ محليًا ثم يضع العملية في طابور الرفع */
+  function persist(s){
+    save();
+    queue = queue.filter(op => !(op.op==="up" && op.id===s.id));
+    queue.push({op:"up", id:s.id, row:rowOf(s)});
+    saveQueue(); updateSync(); flush();
+  }
+  function persistDelete(id){
+    save();
+    queue = queue.filter(op => op.id!==id);
+    queue.push({op:"del", id});
+    saveQueue(); updateSync(); flush();
+  }
+
+  async function flush(){
+    if(!sb || !authed || syncing || !queue.length || !navigator.onLine) return;
+    syncing=true;
+    try{
+      while(queue.length){
+        const op=queue[0];
+        if(op.op==="up"){
+          const {error}=await sb.from("students").upsert(op.row);
+          if(error) throw error;
+        }else{
+          const {error}=await sb.from("students").delete().eq("id",op.id);
+          if(error) throw error;
+        }
+        queue.shift(); saveQueue();
+      }
+    }catch(e){ /* يبقى الطابور حتى المحاولة التالية */ }
+    syncing=false;
+    updateSync();
+  }
+
+  async function pull(){
+    if(!sb || !authed || !navigator.onLine) return;
+    try{
+      const {data,error}=await sb.from("students").select("*");
+      if(error || !data) return;
+      const localOnly = state.students.slice();
+      if(data.length===0 && localOnly.length>0){
+        localOnly.forEach(s=>{ queue.push({op:"up", id:s.id, row:rowOf(s)}); });
+        saveQueue(); await flush();
+        toast("رُفعت بيانات هذا الجهاز إلى السحابة");
+        return;
+      }
+      state.students = data.map(fromRow);
+      save(); render();
+    }catch(e){}
+    updateSync();
+  }
+
+  function watchRemote(){
+    if(!sb || !authed) return;
+    try{
+      sb.channel("students-live")
+        .on("postgres_changes",{event:"*",schema:"public",table:"students"},()=>{ pull(); })
+        .subscribe();
+    }catch(e){}
+  }
+
+  function updateSync(){
+    const el=document.getElementById("syncBadge");
+    if(!el) return;
+    if(!sb){ el.textContent="◍ محلي فقط"; el.title="تعذّر تحميل مكتبة المزامنة"; return; }
+    if(!navigator.onLine){ el.textContent="◍ دون اتصال"+(queue.length?" ("+ed(queue.length)+")":""); el.title="ستُرفع التغييرات عند عودة الاتصال"; return; }
+    if(queue.length){ el.textContent="◍ جارٍ الرفع ("+ed(queue.length)+")"; el.title="تغييرات بانتظار الرفع"; return; }
+    el.textContent="◉ متزامن"; el.title="كل التغييرات محفوظة في السحابة";
+  }
+
+  window.addEventListener("online",()=>{ updateSync(); flush().then(pull); });
+  window.addEventListener("offline",updateSync);
+
   const findS = id => state.students.find(s=>s.id===id);
   const doneCount = s => Object.keys(s.records||{}).length;
   const pctOf = s => Math.round(doneCount(s)/TOTAL*100);
@@ -607,10 +706,6 @@
   const isStale = s => { const d=daysSince(lastDate(s)); return d===null || d>7; };
 
   /* ═══ الدخول ═════════════════════════════════════ */
-  /* لتغيير بيانات دخول المعلمين، عدّل السطرين التاليين فقط */
-  const AUTH_USER = "Bayinat";
-  const AUTH_PASS = "12345678";
-
   const toLatinDigits = s => String(s)
     .replace(/[٠-٩]/g, d => String.fromCharCode(d.charCodeAt(0)-0x0660+48))
     .replace(/[۰-۹]/g, d => String.fromCharCode(d.charCodeAt(0)-0x06F0+48));
@@ -618,16 +713,12 @@
   const lockView=document.getElementById("lockView");
   const userInput=document.getElementById("userInput");
   const passInput=document.getElementById("passInput");
-  const rememberMe=document.getElementById("rememberMe");
   const lockErr=document.getElementById("lockErr");
   const lockBtn=document.getElementById("lockBtn");
 
-  const isSignedIn = () =>
-    sessionStorage.getItem("bayinat_open")==="1" || localStorage.getItem("bayinat_remember")==="1";
-
   function showLock(){
     userInput.value=""; passInput.value=""; lockErr.textContent="";
-    rememberMe.checked=false;
+    lockBtn.disabled=false; lockBtn.textContent="دخول";
     lockView.hidden=false;
     document.body.style.overflow="hidden";
     setTimeout(()=>userInput.focus(),150);
@@ -636,27 +727,62 @@
     lockView.hidden=true;
     document.body.style.overflow="";
   }
-  function submitLock(){
-    const u=userInput.value.trim();
-    const p=toLatinDigits(passInput.value.trim());
-    if(!u || !p){ lockErr.textContent="أدخل اسم المستخدم وكلمة المرور"; return; }
-    if(u.toLowerCase()===AUTH_USER.toLowerCase() && p===AUTH_PASS){
-      sessionStorage.setItem("bayinat_open","1");
-      if(rememberMe.checked) localStorage.setItem("bayinat_remember","1");
-      hideLock();
-      toast("مرحبًا بك في بيّنات");
-    } else {
-      lockErr.textContent="اسم المستخدم أو كلمة المرور غير صحيحة";
-      passInput.value=""; passInput.focus();
-    }
+
+  async function afterSignIn(){
+    authed=true;
+    localStorage.setItem("bayinat_signed","1");
+    hideLock(); updateSync();
+    await flush(); await pull();
+    watchRemote();
   }
+
+  async function submitLock(){
+    const email=userInput.value.trim();
+    const pass=toLatinDigits(passInput.value.trim());
+    if(!email || !pass){ lockErr.textContent="أدخل البريد وكلمة المرور"; return; }
+
+    if(!sb){
+      /* دون اتصال أو تعذّر تحميل المكتبة: يُسمح بالعمل محليًا لمن سبق له الدخول */
+      if(localStorage.getItem("bayinat_signed")==="1"){
+        hideLock(); updateSync();
+        toast("وضع دون اتصال — التغييرات سترفع لاحقًا");
+      } else {
+        lockErr.textContent="تعذّر الاتصال بالخادم. تحقّقي من الإنترنت وأعيدي المحاولة";
+      }
+      return;
+    }
+
+    lockBtn.disabled=true; lockBtn.textContent="جارٍ التحقق...";
+    lockErr.textContent="";
+    try{
+      const {error}=await sb.auth.signInWithPassword({email, password:pass});
+      if(error) throw error;
+      toast("مرحبًا بك في بيّنات");
+      await afterSignIn();
+    }catch(e){
+      const msg=String((e&&e.message)||"");
+      lockErr.textContent = /Invalid login/i.test(msg)
+        ? "البريد أو كلمة المرور غير صحيحة"
+        : (/Email not confirmed/i.test(msg)
+            ? "الحساب غير مُفعّل — فعّلي Auto Confirm في لوحة Supabase"
+            : "تعذّر الدخول: "+msg);
+      passInput.value="";
+    }
+    lockBtn.disabled=false; lockBtn.textContent="دخول";
+  }
+
   lockBtn.addEventListener("click",submitLock);
   [userInput,passInput].forEach(i=>i.addEventListener("keydown",e=>{ if(e.key==="Enter") submitLock(); }));
-  document.getElementById("btnLock").addEventListener("click",()=>{
-    sessionStorage.removeItem("bayinat_open");
-    localStorage.removeItem("bayinat_remember");
+  document.getElementById("btnLock").addEventListener("click",async()=>{
+    if(queue.length && !confirmLeave()) return;
+    localStorage.removeItem("bayinat_signed");
+    authed=false;
+    try{ if(sb) await sb.auth.signOut(); }catch(e){}
     showLock();
   });
+  function confirmLeave(){
+    return window.confirm("توجد تغييرات لم تُرفع بعد ("+ed(queue.length)+"). هل تريدين الخروج على أي حال؟");
+  }
 
   /* ═══ المظهر ═════════════════════════════════════ */
   const themeBtn=document.getElementById("btnTheme");
@@ -765,14 +891,14 @@
           grade: grade,
           note: sheet.querySelector("#dlgNote").value.trim()
         };
-        save(); after(); renderStats(); close();
+        persist(student); after(); renderStats(); close();
         toast("تم تسجيل تسميع سورة "+item.name);
       });
       sheet.querySelector("#dlgCancel").addEventListener("click",close);
       const rm=sheet.querySelector("#dlgRemove");
       if(rm) rm.addEventListener("click",()=>{
         delete student.records[item.num];
-        save(); after(); renderStats(); close();
+        persist(student); after(); renderStats(); close();
         toast("أُلغي تسميع سورة "+item.name);
       });
     });
@@ -922,7 +1048,7 @@
       nameWrap.replaceChildren(inp); inp.focus(); inp.select();
       const commit=()=>{
         const v=inp.value.trim();
-        if(v && v!==s.name){ s.name=v; save(); toast("تم تعديل الاسم"); }
+        if(v && v!==s.name){ s.name=v; persist(s); toast("تم تعديل الاسم"); }
         h3.textContent=s.name; nameWrap.replaceChildren(h3,editBtn);
       };
       inp.addEventListener("blur",commit);
@@ -943,7 +1069,7 @@
       if(Number(s.juz)===j.num) o.selected=true;
       sel.appendChild(o);
     });
-    sel.addEventListener("change",()=>{ s.juz=Number(sel.value); save(); toast("تم تحديث الجزء الحالي"); });
+    sel.addEventListener("change",()=>{ s.juz=Number(sel.value); persist(s); toast("تم تحديث الجزء الحالي"); });
     badge.appendChild(sel);
     head.append(nameWrap,badge);
 
@@ -982,10 +1108,10 @@
         confirming=null;
         const idx=state.students.findIndex(x=>x.id===s.id);
         lastDeleted={student:s,index:idx};
-        state.students.splice(idx,1); save(); render();
+        state.students.splice(idx,1); persistDelete(s.id); render();
         toast("حُذف "+s.name,"تراجع",()=>{
           state.students.splice(lastDeleted.index,0,lastDeleted.student);
-          save(); render(); toast("تم التراجع");
+          persist(lastDeleted.student); render(); toast("تم التراجع");
         });
         return;
       }
@@ -1059,7 +1185,7 @@
           const d=set.filter(x=>s.records[x.num]).length;
           if(d===set.length){ set.forEach(x=>delete s.records[x.num]); toast("أُلغي جزء "+j.name); }
           else { set.forEach(x=>{ if(!s.records[x.num]) s.records[x.num]={date:todayISO(),grade:1,note:""}; }); toast("سُجّل جزء "+j.name+" كاملًا"); }
-          save(); refresh(); paintGroup(); renderStats();
+          persist(s); refresh(); paintGroup(); renderStats();
         });
         paintGroup();
         chipRefs.push({paint:paintGroup});
@@ -1158,12 +1284,13 @@
         });
         sheet.querySelector("#impMerge").addEventListener("click",()=>{
           const have=new Set(state.students.map(s=>s.name));
-          norm(incoming).forEach(s=>{ if(!have.has(s.name)) state.students.push(s); });
-          save(); render(); close(); toast("تم دمج النسخة");
+          norm(incoming).forEach(s=>{ if(!have.has(s.name)){ state.students.push(s); persist(s); } });
+          render(); close(); toast("تم دمج النسخة");
         });
         sheet.querySelector("#impReplace").addEventListener("click",()=>{
           state.students=norm(incoming);
-          save(); render(); close(); toast("تم استبدال البيانات");
+          state.students.forEach(persist);
+          render(); close(); toast("تم استبدال البيانات");
         });
         sheet.querySelector("#impCancel").addEventListener("click",close);
       });
@@ -1184,11 +1311,12 @@
     const inp=document.getElementById("nameInput");
     const name=inp.value.trim();
     if(!name) return;
-    state.students.push({
+    const fresh={
       id:(crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random())),
       name, juz:Number(juzSelect.value), createdAt:Date.now(), records:{}
-    });
-    save(); render();
+    };
+    state.students.push(fresh);
+    persist(fresh); render();
     inp.value=""; inp.focus();
     toast("تمت إضافة "+name);
   });
@@ -1237,11 +1365,21 @@
     } else {
       toast("رابط المتابعة غير صالح");
       render();
-      if(!isSignedIn()) showLock();
+      showLock();
     }
   } else {
     render();
-    if(!isSignedIn()) showLock();
+    updateSync();
+    (async()=>{
+      let session=null;
+      try{ if(sb){ const {data}=await sb.auth.getSession(); session=data&&data.session; } }catch(e){}
+      if(session){ await afterSignIn(); }
+      else if(!sb && localStorage.getItem("bayinat_signed")==="1"){
+        /* دون اتصال: تُعرض البيانات المحفوظة محليًا */
+        updateSync();
+      }
+      else showLock();
+    })();
   }
 })();
 </script>

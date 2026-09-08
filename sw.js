@@ -1,4 +1,4 @@
-const CACHE = "bayinat-v1";
+const CACHE = "bayinat-v2";
 const SHELL = [
   "./",
   "./index.html",
@@ -24,8 +24,11 @@ self.addEventListener("fetch", e => {
   const req = e.request;
   if (req.method !== "GET") return;
 
-  // الخطوط: من الذاكرة أولًا ثم الشبكة مع التخزين
-  if (req.url.includes("fonts.googleapis.com") || req.url.includes("fonts.gstatic.com")) {
+  // نداءات قاعدة البيانات لا تُخزَّن إطلاقًا
+  if (req.url.includes(".supabase.co")) return;
+
+  // الخطوط ومكتبة المزامنة: من الذاكرة أولًا ثم الشبكة مع التخزين
+  if (req.url.includes("fonts.googleapis.com") || req.url.includes("fonts.gstatic.com") || req.url.includes("cdn.jsdelivr.net")) {
     e.respondWith(
       caches.match(req).then(hit => hit || fetch(req).then(res => {
         const copy = res.clone();
