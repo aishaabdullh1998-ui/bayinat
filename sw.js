@@ -1,9 +1,8 @@
-const CACHE = "bayinat-v13";
+const CACHE = "bayinat-v14";
 const SHELL = [
   "./",
   "./index.html",
   "./supabase.js",
-  "./students-seed.json",
   "./manifest.webmanifest",
   "./icon-192.png",
   "./icon-512.png",

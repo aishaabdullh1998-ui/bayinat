@@ -293,7 +293,18 @@
   .card:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg);border-color:var(--brand-tint);}
   .card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
   .name-wrap{display:flex;align-items:center;gap:7px;min-width:0;}
-  .card-head h3{font-size:17.5px;font-weight:600;overflow-wrap:anywhere;}
+  .card-head h3{font-size:17.5px;font-weight:600;overflow-wrap:break-word;line-height:1.45;}
+  .card-badges{display:flex;gap:6px;flex:none;}
+
+  /* على الهاتف: الاسم في سطره كاملًا، والشارات تحته، والأزرار شبكة منتظمة */
+  @media (max-width:560px){
+    .card-head{flex-direction:column;align-items:stretch;gap:9px;}
+    .card-head h3{font-size:16.5px;}
+    .card-badges{flex-wrap:wrap;}
+    .card-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+    .card-actions .icon-btn{justify-content:center;}
+    .name-wrap{width:100%;}
+  }
   .name-edit{
     background:none;border:none;color:var(--ink-faint);cursor:pointer;padding:2px;border-radius:6px;
     opacity:0;transition:opacity .2s, color .2s;flex:none;
@@ -515,7 +526,6 @@
   <div class="toolbar anim" style="animation-delay:.78s">
     <button class="tool" id="btnBackup" type="button">⬇ نسخة احتياطية</button>
     <button class="tool" id="btnRestore" type="button">⬆ استيراد نسخة</button>
-    <button class="tool" id="btnSeed" type="button">⊕ إضافة قائمة المدرسة</button>
     <input type="file" id="fileInput" aria-label="ملف النسخة الاحتياطية" accept="application/json,.json" hidden>
     <button class="tool" id="btnInstall" type="button" hidden>⤓ تثبيت التطبيق</button>
     <span class="tool spacer"></span>
@@ -1287,7 +1297,7 @@
     gradeChip.appendChild(gsel);
 
     const badges=document.createElement("div");
-    badges.style.display="flex"; badges.style.gap="6px"; badges.style.flex="none";
+    badges.className="card-badges";
     badges.append(gradeChip,badge);
     head.append(nameWrap,badges);
 
@@ -1604,48 +1614,6 @@
     setTimeout(()=>URL.revokeObjectURL(url),1000);
     toast("تم تنزيل النسخة الاحتياطية");
   });
-  /* ─── إضافة قائمة طلاب المدرسة بضغطة واحدة ─────── */
-  document.getElementById("btnSeed").addEventListener("click",async()=>{
-    const btn=document.getElementById("btnSeed");
-    btn.disabled=true; const orig=btn.textContent; btn.textContent="⏳ جارٍ التحميل...";
-    try{
-      const res=await fetch("students-seed.json",{cache:"no-store"});
-      if(!res.ok) throw new Error("fetch");
-      const pack=await res.json();
-      const json=new TextDecoder().decode(
-        Uint8Array.from(atob(pack.data), c=>c.charCodeAt(0))
-      );
-      const list=JSON.parse(json);
-      const byName=new Map(state.students.map(s=>[s.name.trim(), s]));
-      let added=0, fixed=0;
-      list.forEach(s=>{
-        const nm=String(s.name).trim();
-        const existing=byName.get(nm);
-        if(existing){
-          /* الطالب موجود: يُصحَّح صفه إن كان ناقصًا أو مخالفًا للقائمة */
-          if(s.grade && existing.grade!==s.grade){
-            existing.grade=s.grade; persist(existing); fixed++;
-          }
-          return;
-        }
-        const fresh={
-          id:s.id||("seed-"+added+"-"+Date.now()),
-          name:s.name, grade:s.grade||"", juz:Number(s.juz)||30,
-          createdAt:s.createdAt||Date.now(), records:{}
-        };
-        state.students.push(fresh); persist(fresh); added++;
-      });
-      render();
-      const parts=[];
-      if(added) parts.push("أُضيف "+ed(added)+" طالبًا");
-      if(fixed) parts.push("صُحّح صف "+ed(fixed));
-      toast(parts.length ? parts.join(" · ") : "القائمة محدَّثة مسبقًا");
-    }catch(e){
-      toast("تعذّر تحميل القائمة — تحقّقي من الاتصال");
-    }
-    btn.disabled=false; btn.textContent=orig;
-  });
-
   const fileInput=document.getElementById("fileInput");
   document.getElementById("btnRestore").addEventListener("click",()=>fileInput.click());
   fileInput.addEventListener("change",()=>{
