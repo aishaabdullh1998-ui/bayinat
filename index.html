@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@400;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Playfair+Display:wght@500;600&family=Reem+Kufi:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="supabase.js"></script>
 <style>
   :root{
     --ground:#F6E7E0;
@@ -856,6 +856,8 @@
   const toLatinDigits = s => String(s)
     .replace(/[٠-٩]/g, d => String.fromCharCode(d.charCodeAt(0)-0x0660+48))
     .replace(/[۰-۹]/g, d => String.fromCharCode(d.charCodeAt(0)-0x06F0+48));
+  const toArabicDigits = s => String(s)
+    .replace(/[0-9]/g, d => String.fromCharCode(d.charCodeAt(0)-48+0x0660));
 
   const lockView=document.getElementById("lockView");
   const userInput=document.getElementById("userInput");
@@ -885,8 +887,12 @@
 
   async function submitLock(){
     const email=userInput.value.trim();
-    const pass=toLatinDigits(passInput.value.trim());
+    const pass=passInput.value.trim();
     if(!email || !pass){ lockErr.textContent="أدخلي البريد وكلمة المرور"; return; }
+
+    /* تُجرَّب كلمة المرور كما كُتبت أولًا، ثم بصيغ الأرقام الأخرى،
+       حتى لا يمنع اختلافُ الأرقام العربية عن الإنجليزية دخولَ المعلمة. */
+    const tries=[...new Set([pass, toLatinDigits(pass), toArabicDigits(pass)])];
 
     if(!sb){
       /* دون اتصال أو تعذّر تحميل المكتبة: يُسمح بالعمل محليًا لمن سبق له الدخول */
@@ -894,7 +900,9 @@
         hideLock(); updateSync();
         toast("وضع دون اتصال — التغييرات سترفع لاحقًا");
       } else {
-        lockErr.textContent="تعذّر الاتصال بالخادم. تحقّقي من الإنترنت وأعيدي المحاولة";
+        lockErr.textContent = navigator.onLine
+          ? "تعذّر تحميل ملفات الدخول. حدّثي الصفحة وأعيدي المحاولة"
+          : "لا يوجد اتصال بالإنترنت. تحقّقي من الشبكة وأعيدي المحاولة";
       }
       return;
     }
@@ -902,7 +910,13 @@
     lockBtn.disabled=true; lockBtn.textContent="جارٍ التحقق...";
     lockErr.textContent="";
     try{
-      const {error}=await sb.auth.signInWithPassword({email, password:pass});
+      let error=null;
+      for(const candidate of tries){
+        const res=await sb.auth.signInWithPassword({email, password:candidate});
+        error=res.error;
+        if(!error) break;
+        if(!/Invalid login/i.test(String(error.message||""))) break;
+      }
       if(error) throw error;
       toast("مرحبًا بكِ في بيّنات");
       await afterSignIn();
