@@ -220,6 +220,47 @@
   .btn.ghost{background:var(--surface-2);color:var(--ink-soft);box-shadow:none;}
   .btn.ghost:hover{background:var(--brand-tint);color:var(--brand);}
 
+  /* ── تبويبات الصفوف ولوحة المتصدرين ─────────────── */
+  .grade-tabs,.board-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
+  .gtab{
+    border:1px solid var(--line);background:var(--surface-2);color:var(--ink-soft);
+    border-radius:999px;padding:7px 15px;font-size:13.5px;font-weight:500;cursor:pointer;
+    display:inline-flex;align-items:center;gap:7px;
+    transition:background .22s, color .22s, border-color .22s, transform .2s var(--ease);
+  }
+  .gtab:hover{transform:translateY(-1px);border-color:var(--brand);}
+  .gtab.on{background:var(--brand);color:var(--on-brand);border-color:var(--brand);}
+  .gtab b{font-weight:600;font-variant-numeric:tabular-nums;opacity:.75;}
+  .gtab.on b{opacity:.9;}
+
+  .board-row{
+    display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:11px;
+    border:1px solid transparent;transition:background .22s, border-color .22s, transform .2s var(--ease);
+  }
+  .board-row:hover{background:var(--surface-2);transform:translateX(-3px);}
+  .board-row+.board-row{margin-top:2px;}
+  .rank{
+    width:30px;height:30px;flex:none;border-radius:50%;display:grid;place-items:center;
+    font-size:13.5px;font-weight:700;background:var(--surface-2);color:var(--ink-soft);
+    font-variant-numeric:tabular-nums;
+  }
+  .board-row.top1 .rank{background:var(--gold);color:#3A2A10;}
+  .board-row.top2 .rank{background:#C9C3BC;color:#33291F;}
+  .board-row.top3 .rank{background:#D0A184;color:#3A2116;}
+  .board-row.top1,.board-row.top2,.board-row.top3{border-color:var(--line);background:var(--surface-2);}
+  .b-main{flex:1;min-width:0;}
+  .b-name{font-size:14.5px;font-weight:600;overflow-wrap:anywhere;}
+  .b-sub{font-size:12px;color:var(--ink-faint);margin-top:1px;}
+  .b-bar{height:6px;border-radius:4px;background:var(--surface-2);overflow:hidden;margin-top:6px;}
+  .b-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--blue),color-mix(in srgb,var(--blue) 60%,var(--brand)));}
+  .b-score{font-size:13px;font-weight:600;color:var(--brand);white-space:nowrap;font-variant-numeric:tabular-nums;}
+  .board-empty{text-align:center;color:var(--ink-faint);font-size:13.5px;padding:22px 10px;}
+  .grade-chip{
+    background:var(--blue-soft);color:var(--blue);border-radius:8px;
+    padding:3px 9px;font-size:12px;font-weight:600;flex:none;
+  }
+  .grade-chip select{border:none;background:transparent;color:inherit;font:inherit;font-weight:600;cursor:pointer;appearance:none;-webkit-appearance:none;}
+
   .search-row{display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;}
   .search-row input[type="text"]{
     flex:1;min-width:180px;border:1px solid var(--line);background:var(--ground);color:var(--ink);
@@ -466,6 +507,7 @@
   <div class="toolbar anim" style="animation-delay:.78s">
     <button class="tool" id="btnBackup" type="button">⬇ نسخة احتياطية</button>
     <button class="tool" id="btnRestore" type="button">⬆ استيراد نسخة</button>
+    <button class="tool" id="btnSeed" type="button">⊕ إضافة قائمة المدرسة</button>
     <input type="file" id="fileInput" aria-label="ملف النسخة الاحتياطية" accept="application/json,.json" hidden>
     <button class="tool" id="btnInstall" type="button" hidden>⤓ تثبيت التطبيق</button>
     <span class="tool spacer"></span>
@@ -483,7 +525,11 @@
         <label for="nameInput">اسم الطالب</label>
         <input id="nameInput" type="text" placeholder="مثال: أحمد محمد" required maxlength="60" autocomplete="off">
       </div>
-      <div class="field" style="flex:1 1 160px">
+      <div class="field" style="flex:1 1 130px">
+        <label for="gradeInput">الصف</label>
+        <select id="gradeInput"></select>
+      </div>
+      <div class="field" style="flex:1 1 130px">
         <label for="juzInput">الجزء الحالي</label>
         <select id="juzInput"></select>
       </div>
@@ -491,7 +537,17 @@
     </form>
   </section>
 
+  <section class="panel" id="boardPanel" hidden>
+    <div class="panel-head">
+      <svg class="tag" viewBox="0 0 42 42" aria-hidden="true"></svg>
+      <h2>لوحة المتصدرين</h2>
+    </div>
+    <div class="board-tabs" id="boardTabs"></div>
+    <div id="boardBody"></div>
+  </section>
+
   <section class="panel" id="listPanel" hidden>
+    <div class="grade-tabs" id="gradeTabs"></div>
     <div class="search-row">
       <input id="searchInput" type="text" placeholder="البحث باسم الطالب..." aria-label="البحث باسم الطالب">
       <select id="sortSelect" aria-label="ترتيب الطلاب">
@@ -543,6 +599,7 @@
     {num:27, name:"الذاريات", range:[51,57]}
   ];
   const GRADES = {1:"ممتاز", 2:"جيد", 3:"يحتاج إعادة"};
+  const CLASSES = ["الأول","الثاني","الثالث","الرابع"];
   const TOTAL = JUZ_LIST.reduce((n,j)=> n + (j.range[1]-j.range[0]+1), 0);
   const groupSurahs = r => { const o=[]; for(let n=r[0];n<=r[1];n++) o.push({num:n,name:SURAHS[n-1]}); return o; };
   const juzName = n => (JUZ_LIST.find(j=>j.num===Number(n))||JUZ_LIST[0]).name;
@@ -635,7 +692,7 @@
 
   /* ═══ التخزين ════════════════════════════════════ */
   const KEY="bayinat_v2", OLD_KEYS=["bayinat_students","tibyan_students"];
-  let state={students:[], settings:{theme:"auto", sort:"created"}};
+  let state={students:[], settings:{theme:"auto", sort:"created", cls:"", board:30, boardAll:false}};
 
   function load(){
     try{
@@ -676,13 +733,21 @@
       sb = window.supabase.createClient(SUPA_URL, SUPA_KEY);
   }catch(e){ sb=null; }
 
-  const rowOf = s => ({
-    id:s.id, name:s.name, juz:Number(s.juz)||30, records:s.records||{},
-    created_at:new Date(s.createdAt||Date.now()).toISOString(),
-    updated_at:new Date().toISOString()
-  });
+  /* يصير true إذا كان عمود الصف غير موجود بعد في قاعدة البيانات،
+     فيواصل التطبيق عمله ويحتفظ بالصف محليًا حتى يُضاف العمود. */
+  let noGradeCol=false;
+
+  const rowOf = s => {
+    const r={
+      id:s.id, name:s.name, juz:Number(s.juz)||30, records:s.records||{},
+      created_at:new Date(s.createdAt||Date.now()).toISOString(),
+      updated_at:new Date().toISOString()
+    };
+    if(!noGradeCol) r.grade=s.grade||"";
+    return r;
+  };
   const fromRow = r => ({
-    id:r.id, name:r.name, juz:Number(r.juz)||30, records:r.records||{},
+    id:r.id, name:r.name, grade:r.grade||"", juz:Number(r.juz)||30, records:r.records||{},
     createdAt: r.created_at ? Date.parse(r.created_at) : Date.now()
   });
 
@@ -707,7 +772,15 @@
       while(queue.length){
         const op=queue[0];
         if(op.op==="up"){
-          const {error}=await sb.from("students").upsert(op.row);
+          let {error}=await sb.from("students").upsert(op.row);
+          /* عمود الصف غير موجود بعد: أعد الإرسال بدونه واحفظ الصف محليًا */
+          if(error && /grade/i.test(String(error.message||"")+String(error.details||""))){
+            noGradeCol=true;
+            const trimmed=Object.assign({},op.row); delete trimmed.grade;
+            queue.forEach(q=>{ if(q.row) delete q.row.grade; });
+            saveQueue();
+            ({error}=await sb.from("students").upsert(trimmed));
+          }
           if(error) throw error;
         }else{
           const {error}=await sb.from("students").delete().eq("id",op.id);
@@ -735,7 +808,13 @@
         return;
       }
       localStorage.setItem("bayinat_migrated","1");
-      state.students = data.map(fromRow);
+      /* إن كان عمود الصف غير موجود في السحابة، نُبقي الصف المحفوظ محليًا */
+      const prev=new Map(state.students.map(s=>[s.id,s]));
+      state.students = data.map(r=>{
+        const s=fromRow(r);
+        if(!("grade" in r)) s.grade=(prev.get(r.id)||{}).grade||"";
+        return s;
+      });
       save(); render();
     }catch(e){}
     updateSync();
@@ -1140,7 +1219,28 @@
     });
     sel.addEventListener("change",()=>{ s.juz=Number(sel.value); persist(s); toast("تم تحديث الجزء الحالي"); });
     badge.appendChild(sel);
-    head.append(nameWrap,badge);
+
+    const gradeChip=document.createElement("div");
+    gradeChip.className="grade-chip";
+    const gsel=document.createElement("select");
+    gsel.setAttribute("aria-label","صف الطالب");
+    [{v:"",t:"بلا صف"}].concat(CLASSES.map(c=>({v:c,t:"الصف "+c}))).forEach(o=>{
+      const op=document.createElement("option");
+      op.value=o.v; op.textContent=o.t;
+      if((s.grade||"")===o.v) op.selected=true;
+      gsel.appendChild(op);
+    });
+    gsel.addEventListener("change",()=>{
+      s.grade=gsel.value; persist(s);
+      renderGradeTabs(); renderBoard();
+      toast("تم تحديث الصف");
+    });
+    gradeChip.appendChild(gsel);
+
+    const badges=document.createElement("div");
+    badges.style.display="flex"; badges.style.gap="6px"; badges.style.flex="none";
+    badges.append(gradeChip,badge);
+    head.append(nameWrap,badges);
 
     /* آخر تسميع */
     const meta=document.createElement("div");
@@ -1289,12 +1389,124 @@
     return c;
   }
 
+  /* ─── تبويبات الصفوف ─────────────────────────────── */
+  function inClass(s){
+    const c=state.settings.cls||"";
+    return !c || (s.grade||"")===c;
+  }
+  function renderGradeTabs(){
+    const box=document.getElementById("gradeTabs");
+    if(!box) return;
+    const cur=state.settings.cls||"";
+    const counts={};
+    state.students.forEach(s=>{ const g=s.grade||""; counts[g]=(counts[g]||0)+1; });
+    const items=[{v:"",label:"كل الصفوف",n:state.students.length}]
+      .concat(CLASSES.map(c=>({v:c,label:"الصف "+c,n:counts[c]||0})));
+    if(counts[""]) items.push({v:"__none__",label:"بلا صف",n:counts[""]});
+    box.textContent="";
+    items.forEach(it=>{
+      const b=document.createElement("button");
+      b.type="button";
+      b.className="gtab"+(cur===it.v?" on":"");
+      b.innerHTML='<span>'+it.label+'</span><b>'+ed(it.n)+'</b>';
+      b.addEventListener("click",()=>{
+        state.settings.cls = (cur===it.v ? "" : it.v);
+        save(); renderGradeTabs(); renderGrid(); renderBoard();
+      });
+      box.appendChild(b);
+    });
+  }
+  function classFiltered(list){
+    const c=state.settings.cls||"";
+    if(!c) return list;
+    if(c==="__none__") return list.filter(s=>!(s.grade||""));
+    return list.filter(s=>(s.grade||"")===c);
+  }
+
+  /* ─── لوحة المتصدرين ─────────────────────────────── */
+  function boardScore(s,juzNum){
+    const j=JUZ_LIST.find(x=>x.num===juzNum);
+    if(!j) return {done:0,total:0,points:0,last:0};
+    let done=0, points=0, last=0;
+    for(let n=j.range[0]; n<=j.range[1]; n++){
+      const r=(s.records||{})[n];
+      if(!r) continue;
+      done++;
+      points += r.grade===1?3:(r.grade===2?2:1);
+      const t=r.date?Date.parse(r.date):0;
+      if(t>last) last=t;
+    }
+    return {done, total:j.range[1]-j.range[0]+1, points, last};
+  }
+  function renderBoardTabs(){
+    const box=document.getElementById("boardTabs");
+    if(!box) return;
+    const cur=Number(state.settings.board||30);
+    box.textContent="";
+    JUZ_LIST.forEach(j=>{
+      const b=document.createElement("button");
+      b.type="button";
+      b.className="gtab"+(cur===j.num?" on":"");
+      b.textContent=j.name;
+      b.addEventListener("click",()=>{
+        state.settings.board=j.num; save(); renderBoardTabs(); renderBoard();
+      });
+      box.appendChild(b);
+    });
+  }
+  function renderBoard(){
+    const panel=document.getElementById("boardPanel");
+    const body=document.getElementById("boardBody");
+    if(!panel||!body) return;
+    if(state.students.length===0){ panel.hidden=true; return; }
+    panel.hidden=false;
+
+    const juzNum=Number(state.settings.board||30);
+    const j=JUZ_LIST.find(x=>x.num===juzNum)||JUZ_LIST[0];
+    const ranked=classFiltered(state.students)
+      .map(s=>({s, m:boardScore(s,juzNum)}))
+      .filter(x=>x.m.done>0)
+      .sort((a,b)=> b.m.done-a.m.done || b.m.points-a.m.points || a.m.last-b.m.last
+                    || a.s.name.localeCompare(b.s.name,"ar"));
+
+    body.textContent="";
+    if(ranked.length===0){
+      body.innerHTML='<div class="board-empty">لم يُسجَّل تسميع في جزء '+j.name+' بعد.</div>';
+      return;
+    }
+    const limit = state.settings.boardAll ? ranked.length : Math.min(ranked.length,10);
+    ranked.slice(0,limit).forEach((x,i)=>{
+      const row=document.createElement("div");
+      row.className="board-row"+(i<3?" top"+(i+1):"");
+      const pct=Math.round(x.m.done/x.m.total*100);
+      row.innerHTML=
+        '<div class="rank">'+ed(i+1)+'</div>'+
+        '<div class="b-main">'+
+          '<div class="b-name">'+esc(x.s.name)+'</div>'+
+          '<div class="b-sub">'+(x.s.grade?"الصف "+esc(x.s.grade)+" · ":"")+
+            ed(x.m.done)+" من "+ed(x.m.total)+" سورة</div>"+
+          '<div class="b-bar"><div class="b-fill" style="width:'+pct+'%"></div></div>'+
+        '</div>'+
+        '<div class="b-score">'+ed(x.m.points)+' نقطة</div>';
+      body.appendChild(row);
+    });
+    if(ranked.length>10){
+      const more=document.createElement("div");
+      more.style.textAlign="center"; more.style.marginTop="12px";
+      const b=document.createElement("button");
+      b.type="button"; b.className="linkish";
+      b.textContent = state.settings.boardAll ? "عرض العشرة الأوائل فقط" : "عرض القائمة كاملة ("+ed(ranked.length)+")";
+      b.addEventListener("click",()=>{ state.settings.boardAll=!state.settings.boardAll; save(); renderBoard(); });
+      more.appendChild(b); body.appendChild(more);
+    }
+  }
+
   function renderGrid(){
     const grid=document.getElementById("studentsGrid");
     const listPanel=document.getElementById("listPanel");
     const empty=document.getElementById("emptyState");
     const q=searchInput.value.trim();
-    const all=sortStudents(state.students);
+    const all=classFiltered(sortStudents(state.students));
     const filtered=q?all.filter(s=>s.name.includes(q)):all;
 
     if(state.students.length===0){
@@ -1313,7 +1525,7 @@
     }
     filtered.forEach((s,i)=>grid.appendChild(renderCard(s,i)));
   }
-  function render(){ renderStats(); renderGrid(); }
+  function render(){ renderStats(); renderGradeTabs(); renderBoardTabs(); renderBoard(); renderGrid(); }
 
   /* ═══ النسخ الاحتياطي ════════════════════════════ */
   document.getElementById("btnBackup").addEventListener("click",()=>{
@@ -1326,6 +1538,37 @@
     setTimeout(()=>URL.revokeObjectURL(url),1000);
     toast("تم تنزيل النسخة الاحتياطية");
   });
+  /* ─── إضافة قائمة طلاب المدرسة بضغطة واحدة ─────── */
+  document.getElementById("btnSeed").addEventListener("click",async()=>{
+    const btn=document.getElementById("btnSeed");
+    btn.disabled=true; const orig=btn.textContent; btn.textContent="⏳ جارٍ التحميل...";
+    try{
+      const res=await fetch("students-seed.json",{cache:"no-store"});
+      if(!res.ok) throw new Error("fetch");
+      const pack=await res.json();
+      const json=new TextDecoder().decode(
+        Uint8Array.from(atob(pack.data), c=>c.charCodeAt(0))
+      );
+      const list=JSON.parse(json);
+      const have=new Set(state.students.map(s=>s.name.trim()));
+      let added=0;
+      list.forEach(s=>{
+        if(have.has(String(s.name).trim())) return;
+        const fresh={
+          id:s.id||("seed-"+added+"-"+Date.now()),
+          name:s.name, grade:s.grade||"", juz:Number(s.juz)||30,
+          createdAt:s.createdAt||Date.now(), records:{}
+        };
+        state.students.push(fresh); persist(fresh); added++;
+      });
+      render();
+      toast(added ? "أُضيف "+ed(added)+" طالبًا" : "جميع الطلاب مضافون مسبقًا");
+    }catch(e){
+      toast("تعذّر تحميل القائمة — تحقّقي من الاتصال");
+    }
+    btn.disabled=false; btn.textContent=orig;
+  });
+
   const fileInput=document.getElementById("fileInput");
   document.getElementById("btnRestore").addEventListener("click",()=>fileInput.click());
   fileInput.addEventListener("change",()=>{
@@ -1340,16 +1583,19 @@
       if(!incoming){ toast("الملف غير صالح"); fileInput.value=""; return; }
       openSheet((sheet,close)=>{
         sheet.innerHTML=
-          '<h3>استيراد نسخة احتياطية</h3>'+
-          '<div class="sub">الملف يحتوي على '+ed(incoming.length)+' طالب. اختاري طريقة الاستيراد.</div>'+
-          '<div class="sheet-actions">'+
-            '<button type="button" class="btn" id="impMerge">دمج مع الحالي</button>'+
-            '<button type="button" class="btn ghost" id="impReplace">استبدال الكل</button>'+
+          '<h3>استيراد قائمة الطلاب</h3>'+
+          '<div class="sub">الملف يحتوي على '+ed(incoming.length)+' طالبًا.</div>'+
+          '<div class="sheet-actions" style="flex-direction:column;gap:10px">'+
+            '<button type="button" class="btn" id="impMerge">إضافتهم إلى القائمة الحالية</button>'+
+            '<button type="button" class="btn ghost" id="impReplace">استبدال القائمة بالكامل</button>'+
+          '</div>'+
+          '<div class="sub" style="margin-top:10px;text-align:center">'+
+            'الإضافة لا تحذف أي طالب موجود، والاستبدال يمسح القائمة الحالية ويضع هذه مكانها.'+
           '</div>'+
           '<div style="text-align:center;margin-top:8px"><button type="button" class="linkish" id="impCancel">إلغاء</button></div>';
         const norm = arr => arr.map(s=>{
           const records = s.records || (()=>{ const r={}; (s.completedSurahs||[]).forEach(n=>r[n]={date:"",grade:1,note:""}); return r; })();
-          return {id:s.id||String(Date.now()+Math.random()), name:s.name, juz:s.juz||30, createdAt:s.createdAt||Date.now(), records};
+          return {id:s.id||String(Date.now()+Math.random()), name:s.name, grade:s.grade||"", juz:s.juz||30, createdAt:s.createdAt||Date.now(), records};
         });
         sheet.querySelector("#impMerge").addEventListener("click",()=>{
           const have=new Set(state.students.map(s=>s.name));
@@ -1357,7 +1603,10 @@
           render(); close(); toast("تم دمج النسخة");
         });
         sheet.querySelector("#impReplace").addEventListener("click",()=>{
-          state.students=norm(incoming);
+          const fresh=norm(incoming);
+          const keep=new Set(fresh.map(s=>s.id));
+          state.students.forEach(old=>{ if(!keep.has(old.id)) persistDelete(old.id); });
+          state.students=fresh;
           state.students.forEach(persist);
           render(); close(); toast("تم استبدال البيانات");
         });
@@ -1374,6 +1623,11 @@
     const o=document.createElement("option");
     o.value=j.num; o.textContent=j.name; juzSelect.appendChild(o);
   });
+  const gradeSelect=document.getElementById("gradeInput");
+  CLASSES.forEach(c=>{
+    const o=document.createElement("option");
+    o.value=c; o.textContent="الصف "+c; gradeSelect.appendChild(o);
+  });
 
   document.getElementById("addForm").addEventListener("submit",e=>{
     e.preventDefault();
@@ -1382,7 +1636,7 @@
     if(!name) return;
     const fresh={
       id:(crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random())),
-      name, juz:Number(juzSelect.value), createdAt:Date.now(), records:{}
+      name, grade:gradeSelect.value, juz:Number(juzSelect.value), createdAt:Date.now(), records:{}
     };
     state.students.push(fresh);
     persist(fresh); render();
