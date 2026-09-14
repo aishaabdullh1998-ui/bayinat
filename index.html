@@ -733,23 +733,28 @@
       sb = window.supabase.createClient(SUPA_URL, SUPA_KEY);
   }catch(e){ sb=null; }
 
-  /* يصير true إذا كان عمود الصف غير موجود بعد في قاعدة البيانات،
-     فيواصل التطبيق عمله ويحتفظ بالصف محليًا حتى يُضاف العمود. */
-  let noGradeCol=false;
+  let syncError="", lastReported="";
 
+  /* الصف يُحفظ داخل حقل records تحت مفتاح غير رقمي،
+     فلا يحتاج التطبيق أي تعديل على بنية قاعدة البيانات. */
   const rowOf = s => {
-    const r={
-      id:s.id, name:s.name, juz:Number(s.juz)||30, records:s.records||{},
+    const rec=Object.assign({}, s.records||{});
+    if(s.grade) rec.__grade=s.grade; else delete rec.__grade;
+    return {
+      id:s.id, name:s.name, juz:Number(s.juz)||30, records:rec,
       created_at:new Date(s.createdAt||Date.now()).toISOString(),
       updated_at:new Date().toISOString()
     };
-    if(!noGradeCol) r.grade=s.grade||"";
-    return r;
   };
-  const fromRow = r => ({
-    id:r.id, name:r.name, grade:r.grade||"", juz:Number(r.juz)||30, records:r.records||{},
-    createdAt: r.created_at ? Date.parse(r.created_at) : Date.now()
-  });
+  const fromRow = r => {
+    const rec=Object.assign({}, r.records||{});
+    const g = r.grade || rec.__grade || "";
+    delete rec.__grade;
+    return {
+      id:r.id, name:r.name, grade:g, juz:Number(r.juz)||30, records:rec,
+      createdAt: r.created_at ? Date.parse(r.created_at) : Date.now()
+    };
+  };
 
   /* يحفظ محليًا ثم يضع العملية في طابور الرفع */
   function persist(s){
@@ -772,14 +777,19 @@
       while(queue.length){
         const op=queue[0];
         if(op.op==="up"){
-          let {error}=await sb.from("students").upsert(op.row);
-          /* عمود الصف غير موجود بعد: أعد الإرسال بدونه واحفظ الصف محليًا */
-          if(error && /grade/i.test(String(error.message||"")+String(error.details||""))){
-            noGradeCol=true;
-            const trimmed=Object.assign({},op.row); delete trimmed.grade;
-            queue.forEach(q=>{ if(q.row) delete q.row.grade; });
-            saveQueue();
-            ({error}=await sb.from("students").upsert(trimmed));
+          /* أعمدة قد لا تكون موجودة في جداول قديمة: تُحذف ويُعاد الإرسال */
+          let row=op.row;
+          let {error}=await sb.from("students").upsert(row);
+          const missing = error && /column .* does not exist|Could not find the/i.test(String(error.message||""));
+          if(missing){
+            const bad=(String(error.message||"").match(/'([^']+)'|column \w+\.(\w+)/)||[])[1]
+                   || (String(error.message||"").match(/column \w+\.(\w+)/)||[])[1];
+            if(bad && bad in row){
+              row=Object.assign({},row); delete row[bad];
+              queue.forEach(q=>{ if(q.row) delete q.row[bad]; });
+              saveQueue();
+              ({error}=await sb.from("students").upsert(row));
+            }
           }
           if(error) throw error;
         }else{
@@ -787,8 +797,16 @@
           if(error) throw error;
         }
         queue.shift(); saveQueue();
+        syncError="";
       }
-    }catch(e){ /* يبقى الطابور حتى المحاولة التالية */ }
+    }catch(e){
+      /* يبقى الطابور حتى المحاولة التالية، ويُعرض السبب بدل الصمت */
+      syncError=String((e&&(e.message||e.hint))||"خطأ غير معروف");
+      if(syncError!==lastReported){
+        lastReported=syncError;
+        toast("تعذّر الرفع: "+syncError);
+      }
+    }
     syncing=false;
     updateSync();
   }
@@ -808,13 +826,19 @@
         return;
       }
       localStorage.setItem("bayinat_migrated","1");
+
+      /* الطلاب الذين لم يكتمل رفعهم بعد لا يجوز أن تمحوهم نسخة السحابة */
+      const pendingIds=new Set(queue.filter(q=>q.op==="up").map(q=>q.id));
+      const remoteIds=new Set(data.map(r=>r.id));
+      const stillPending=state.students.filter(s=>pendingIds.has(s.id) && !remoteIds.has(s.id));
+
       /* إن كان عمود الصف غير موجود في السحابة، نُبقي الصف المحفوظ محليًا */
       const prev=new Map(state.students.map(s=>[s.id,s]));
       state.students = data.map(r=>{
         const s=fromRow(r);
         if(!("grade" in r)) s.grade=(prev.get(r.id)||{}).grade||"";
         return s;
-      });
+      }).concat(stillPending);
       save(); render();
     }catch(e){}
     updateSync();
@@ -835,6 +859,7 @@
     if(!sb){ el.textContent="◍ محلي فقط"; el.title="تعذّر تحميل مكتبة المزامنة"; return; }
     if(!authed){ el.textContent="◍ غير مسجّلة الدخول"; el.title="سجّلي الدخول لمزامنة البيانات"; return; }
     if(!navigator.onLine){ el.textContent="◍ دون اتصال"+(queue.length?" ("+ed(queue.length)+")":""); el.title="ستُرفع التغييرات عند عودة الاتصال"; return; }
+    if(syncError && queue.length){ el.textContent="⚠ تعذّر الرفع ("+ed(queue.length)+")"; el.title=syncError; return; }
     if(queue.length){ el.textContent="◍ جارٍ الرفع ("+ed(queue.length)+")"; el.title="تغييرات بانتظار الرفع"; return; }
     el.textContent="◉ متزامن"; el.title="كل التغييرات محفوظة في السحابة";
   }
@@ -843,11 +868,13 @@
   window.addEventListener("offline",updateSync);
 
   const findS = id => state.students.find(s=>s.id===id);
-  const doneCount = s => Object.keys(s.records||{}).length;
+  /* لا تُحسب إلا مفاتيح السور الرقمية — فحقل الصف يُخزَّن داخل نفس الحقل */
+  const surahKeys = s => Object.keys(s.records||{}).filter(k=>/^\d+$/.test(k));
+  const doneCount = s => surahKeys(s).length;
   const pctOf = s => Math.round(doneCount(s)/TOTAL*100);
   function lastDate(s){
     let best="";
-    Object.values(s.records||{}).forEach(r=>{ if(r.date && r.date>best) best=r.date; });
+    surahKeys(s).forEach(k=>{ const r=s.records[k]; if(r && r.date && r.date>best) best=r.date; });
     return best;
   }
   const isStale = s => { const d=daysSince(lastDate(s)); return d===null || d>7; };
@@ -1683,7 +1710,27 @@
     deferredPrompt.userChoice.finally(()=>{ deferredPrompt=null; installBtn.hidden=true; });
   });
   if("serviceWorker" in navigator && location.protocol==="https:"){
-    window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+    window.addEventListener("load",()=>{
+      navigator.serviceWorker.register("sw.js").then(reg=>{
+        reg.update().catch(()=>{});
+        /* تحديث فوري عند صدور نسخة جديدة، فلا تبقى معلمة على نسخة قديمة */
+        reg.addEventListener("updatefound",()=>{
+          const nw=reg.installing;
+          if(!nw) return;
+          nw.addEventListener("statechange",()=>{
+            if(nw.state==="installed" && navigator.serviceWorker.controller) reloadOnce();
+          });
+        });
+      }).catch(()=>{});
+      let reloaded=false;
+      function reloadOnce(){
+        if(reloaded) return;
+        reloaded=true;
+        toast("وصلت نسخة محدَّثة — جارٍ التحديث");
+        setTimeout(()=>location.reload(),900);
+      }
+      navigator.serviceWorker.addEventListener("controllerchange",reloadOnce);
+    });
   }
 
   /* ═══ الإقلاع ════════════════════════════════════ */
