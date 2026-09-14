@@ -255,6 +255,14 @@
   .b-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--blue),color-mix(in srgb,var(--blue) 60%,var(--brand)));}
   .b-score{font-size:13px;font-weight:600;color:var(--brand);white-space:nowrap;font-variant-numeric:tabular-nums;}
   .board-empty{text-align:center;color:var(--ink-faint);font-size:13.5px;padding:22px 10px;}
+  .class-head{
+    grid-column:1/-1;display:flex;align-items:center;gap:12px;
+    margin:18px 2px 2px;font-size:14.5px;font-weight:700;color:var(--brand);
+  }
+  .class-head:first-child{margin-top:0;}
+  .class-head .bar{flex:1;height:1px;background:var(--line);}
+  .class-head .n{font-size:12.5px;font-weight:500;color:var(--ink-faint);font-variant-numeric:tabular-nums;}
+
   .grade-chip{
     background:var(--blue-soft);color:var(--blue);border-radius:8px;
     padding:3px 9px;font-size:12px;font-weight:600;flex:none;
@@ -1564,6 +1572,23 @@
       d.innerHTML="<h3>لا توجد نتائج</h3><p>لم نعثر على طالب بهذا الاسم.</p>";
       grid.appendChild(d); return;
     }
+
+    /* عند عرض كل الصفوف تُصنَّف القائمة بعناوين: الصف الأول، الثاني… */
+    if(!(state.settings.cls||"")){
+      const groups=CLASSES.map(c=>({c, list:filtered.filter(s=>(s.grade||"")===c)}))
+        .concat([{c:"", list:filtered.filter(s=>!(s.grade||""))}])
+        .filter(g=>g.list.length);
+      let i=0;
+      groups.forEach(g=>{
+        const head=document.createElement("div");
+        head.className="class-head";
+        head.innerHTML='<span>'+(g.c?"الصف "+esc(g.c):"بلا صف")+'</span>'+
+                       '<span class="bar"></span><span class="n">'+ed(g.list.length)+' طالب</span>';
+        grid.appendChild(head);
+        g.list.forEach(s=>grid.appendChild(renderCard(s,i++)));
+      });
+      return;
+    }
     filtered.forEach((s,i)=>grid.appendChild(renderCard(s,i)));
   }
   function render(){ renderStats(); renderGradeTabs(); renderBoardTabs(); renderBoard(); renderGrid(); }
@@ -1591,10 +1616,18 @@
         Uint8Array.from(atob(pack.data), c=>c.charCodeAt(0))
       );
       const list=JSON.parse(json);
-      const have=new Set(state.students.map(s=>s.name.trim()));
-      let added=0;
+      const byName=new Map(state.students.map(s=>[s.name.trim(), s]));
+      let added=0, fixed=0;
       list.forEach(s=>{
-        if(have.has(String(s.name).trim())) return;
+        const nm=String(s.name).trim();
+        const existing=byName.get(nm);
+        if(existing){
+          /* الطالب موجود: يُصحَّح صفه إن كان ناقصًا أو مخالفًا للقائمة */
+          if(s.grade && existing.grade!==s.grade){
+            existing.grade=s.grade; persist(existing); fixed++;
+          }
+          return;
+        }
         const fresh={
           id:s.id||("seed-"+added+"-"+Date.now()),
           name:s.name, grade:s.grade||"", juz:Number(s.juz)||30,
@@ -1603,7 +1636,10 @@
         state.students.push(fresh); persist(fresh); added++;
       });
       render();
-      toast(added ? "أُضيف "+ed(added)+" طالبًا" : "جميع الطلاب مضافون مسبقًا");
+      const parts=[];
+      if(added) parts.push("أُضيف "+ed(added)+" طالبًا");
+      if(fixed) parts.push("صُحّح صف "+ed(fixed));
+      toast(parts.length ? parts.join(" · ") : "القائمة محدَّثة مسبقًا");
     }catch(e){
       toast("تعذّر تحميل القائمة — تحقّقي من الاتصال");
     }
