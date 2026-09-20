@@ -233,6 +233,20 @@
   .gtab b{font-weight:600;font-variant-numeric:tabular-nums;opacity:.75;}
   .gtab.on b{opacity:.9;}
 
+  /* لوحة المتصدرين مطوية افتراضيًا وتُفتح بالنقر */
+  .board-toggle{
+    width:100%;background:none;border:none;padding:0;margin:0;cursor:pointer;
+    color:inherit;text-align:start;font:inherit;
+  }
+  .board-toggle:hover h2{color:var(--brand);}
+  .board-toggle .hint{margin-inline-start:auto;font-size:12.5px;color:var(--ink-faint);font-variant-numeric:tabular-nums;}
+  .board-toggle .chevron{font-size:12px;color:var(--ink-soft);transition:transform .35s var(--ease);}
+  .board-toggle[aria-expanded="true"] .chevron{transform:rotate(180deg);}
+  .board-wrap{display:grid;grid-template-rows:0fr;transition:grid-template-rows .4s var(--ease);}
+  .board-inner{overflow:hidden;min-height:0;}
+  #boardPanel.open .board-wrap{grid-template-rows:1fr;}
+  #boardPanel.open .board-inner{padding-top:16px;}
+
   .board-row{
     display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:11px;
     border:1px solid transparent;transition:background .22s, border-color .22s, transform .2s var(--ease);
@@ -457,6 +471,7 @@
   footer .school{color:var(--ink);font-weight:600;font-size:14.5px;}
   footer .credit{margin-top:6px;}
   footer .credit b{color:var(--brand);font-weight:600;}
+  footer .ver{margin-top:14px;font-size:11.5px;color:var(--ink-faint);font-variant-numeric:tabular-nums;letter-spacing:.02em;}
   footer .logout{margin-top:20px;background:transparent;border:1px solid var(--line);}
   footer .logout:hover{background:var(--danger-soft);color:var(--danger);border-color:var(--danger);}
 
@@ -558,12 +573,18 @@
   </section>
 
   <section class="panel" id="boardPanel" hidden>
-    <div class="panel-head">
+    <button class="panel-head board-toggle" id="boardToggle" type="button" aria-expanded="false">
       <svg class="tag" viewBox="0 0 42 42" aria-hidden="true"></svg>
       <h2>لوحة المتصدرين</h2>
+      <span class="hint" id="boardHint"></span>
+      <span class="chevron">▾</span>
+    </button>
+    <div class="board-wrap">
+      <div class="board-inner">
+        <div class="board-tabs" id="boardTabs"></div>
+        <div id="boardBody"></div>
+      </div>
     </div>
-    <div class="board-tabs" id="boardTabs"></div>
-    <div id="boardBody"></div>
   </section>
 
   <section class="panel" id="listPanel" hidden>
@@ -600,6 +621,7 @@
   <div>منصة بيّنات لمتابعة التسميع — البيانات محفوظة ومشتركة بين أجهزة المعلمات</div>
   <div class="credit">تصميم: <b>أ. عائشة البروانية</b></div>
   <button class="tool logout" id="btnLock" type="button">⌾ تسجيل الخروج</button>
+  <div class="ver" id="verLine"></div>
 </footer>
 
 <div class="botanic botanic-a" data-branch="1" aria-hidden="true"></div>
@@ -618,6 +640,7 @@
     {num:28, name:"قد سمع",   range:[58,66]},
     {num:27, name:"الذاريات", range:[51,57]}
   ];
+  const APP_VERSION="17";
   const GRADES = {1:"ممتاز", 2:"جيد", 3:"يحتاج إعادة"};
   const CLASSES = ["الأول","الثاني","الثالث","الرابع"];
   const TOTAL = JUZ_LIST.reduce((n,j)=> n + (j.range[1]-j.range[0]+1), 0);
@@ -853,13 +876,25 @@
       const remoteIds=new Set(data.map(r=>r.id));
       const stillPending=state.students.filter(s=>pendingIds.has(s.id) && !remoteIds.has(s.id));
 
-      /* إن كان عمود الصف غير موجود في السحابة، نُبقي الصف المحفوظ محليًا */
+      /* المعالجة الذاتية: أي طالب صفه معروف على هذا الجهاز لكنه ناقص في السحابة
+         يُرفع صفه فورًا، فتكتمل الصفوف في السحابة من أول جهاز يحمل بياناتها. */
       const prev=new Map(state.students.map(s=>[s.id,s]));
+      const toHeal=[];
       state.students = data.map(r=>{
         const s=fromRow(r);
-        if(!("grade" in r)) s.grade=(prev.get(r.id)||{}).grade||"";
+        const localGrade=(prev.get(r.id)||{}).grade||"";
+        if(!s.grade && localGrade){ s.grade=localGrade; toHeal.push(s); }
         return s;
       }).concat(stillPending);
+      if(toHeal.length){
+        toHeal.forEach(s=>{
+          queue=queue.filter(op=>!(op.op==="up"&&op.id===s.id));
+          queue.push({op:"up",id:s.id,row:rowOf(s)});
+        });
+        saveQueue();
+        setTimeout(flush,0);
+        toast("يُرفع صف "+ed(toHeal.length)+" طالبًا إلى السحابة");
+      }
       /* لا يُعاد الرسم إن كانت نسخة السحابة مطابقة لما هو معروض (صدى كتابتنا نحن) */
       const sig=list=>JSON.stringify(list.slice().sort((a,b)=>a.id<b.id?-1:1));
       const changed = sig(state.students)!==sig(prevList);
@@ -890,7 +925,9 @@
     if(!navigator.onLine){ el.textContent="◍ دون اتصال"+(queue.length?" ("+ed(queue.length)+")":""); el.title="ستُرفع التغييرات عند عودة الاتصال"; return; }
     if(syncError && queue.length){ el.textContent="⚠ تعذّر الرفع ("+ed(queue.length)+")"; el.title=syncError; return; }
     if(queue.length){ el.textContent="◍ جارٍ الرفع ("+ed(queue.length)+")"; el.title="تغييرات بانتظار الرفع"; return; }
-    el.textContent="◉ متزامن"; el.title="كل التغييرات محفوظة في السحابة";
+    const withG=state.students.filter(s=>s.grade).length;
+    el.textContent="◉ متزامن";
+    el.title="كل التغييرات محفوظة في السحابة · "+ed(state.students.length)+" طالبًا، منهم "+ed(withG)+" بصف محدّد";
   }
 
   window.addEventListener("online",()=>{ updateSync(); flush().then(pull); });
@@ -1058,6 +1095,8 @@
     countTo(document.getElementById("statAvg"),"a",avg,"٪");
     countTo(document.getElementById("statStale"),"w",stale,"");
     document.getElementById("mbMeta").textContent = st.length ? ed(st.length)+" طالب · "+ed(total)+" سورة" : "";
+    const vl=document.getElementById("verLine");
+    if(vl) vl.textContent="الإصدار "+ed(APP_VERSION)+(st.length?" · "+ed(st.length)+" طالبًا · "+ed(st.filter(s=>s.grade).length)+" بصف محدّد":"");
   }
 
   /* ═══ نافذة التسميع ══════════════════════════════ */
@@ -1568,12 +1607,24 @@
       box.appendChild(b);
     });
   }
+  function applyBoardOpen(){
+    const panel=document.getElementById("boardPanel");
+    const btn=document.getElementById("boardToggle");
+    const o=!!state.settings.boardOpen;
+    panel.classList.toggle("open",o);
+    btn.setAttribute("aria-expanded",o?"true":"false");
+  }
+  document.getElementById("boardToggle").addEventListener("click",()=>{
+    state.settings.boardOpen=!state.settings.boardOpen; save(); applyBoardOpen();
+  });
+
   function renderBoard(){
     const panel=document.getElementById("boardPanel");
     const body=document.getElementById("boardBody");
     if(!panel||!body) return;
     if(state.students.length===0){ panel.hidden=true; return; }
     panel.hidden=false;
+    applyBoardOpen();
 
     const juzNum=Number(state.settings.board||30);
     const j=JUZ_LIST.find(x=>x.num===juzNum)||JUZ_LIST[0];
@@ -1582,6 +1633,9 @@
       .filter(x=>x.m.done>0)
       .sort((a,b)=> b.m.done-a.m.done || b.m.points-a.m.points || a.m.last-b.m.last
                     || a.s.name.localeCompare(b.s.name,"ar"));
+
+    const hint=document.getElementById("boardHint");
+    if(hint) hint.textContent = ranked.length ? "المتصدر في "+j.name+": "+ranked[0].s.name : "";
 
     body.textContent="";
     if(ranked.length===0){
@@ -1756,6 +1810,39 @@
     document.getElementById("addPanel").scrollIntoView({block:"center"});
     setTimeout(()=>document.getElementById("nameInput").focus(),450);
   });
+
+  /* منفذ اختبار محلي فقط — لا يعمل على الموقع المنشور */
+  if(location.hostname==="localhost"){
+    window.__test={ get state(){return state;}, get queue(){return queue;}, pull, setSb(x){ sb=x; authed=true; } };
+  }
+
+  /* ═══ الإصدار والتحديث الإجباري ══════════════════ */
+
+  /* يقارن إصدار الصفحة المعروضة بإصدار الخادم؛ فإن اختلفا يمسح كل ذاكرة
+     مؤقتة ويعيد التحميل — فلا يبقى أي جهاز على نسخة قديمة مهما عاند. */
+  async function ensureLatest(){
+    if(location.protocol!=="https:" || !navigator.onLine) return;
+    try{
+      const res=await fetch("sw.js?_="+Date.now(),{cache:"no-store"});
+      if(!res.ok) return;
+      const m=(await res.text()).match(/bayinat-v(\d+)/);
+      if(!m || m[1]===APP_VERSION) return;
+      if(sessionStorage.getItem("bayinat_forced")===m[1]) return;
+      sessionStorage.setItem("bayinat_forced",m[1]);
+      if("serviceWorker" in navigator){
+        const regs=await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map(r=>r.unregister()));
+      }
+      if(window.caches){
+        const keys=await caches.keys();
+        await Promise.all(keys.map(k=>caches.delete(k)));
+      }
+      toast("وصلت نسخة محدَّثة — جارٍ التحديث");
+      setTimeout(()=>location.reload(),800);
+    }catch(e){}
+  }
+  ensureLatest();
+  window.addEventListener("focus",ensureLatest);
 
   /* تثبيت التطبيق */
   let deferredPrompt=null;

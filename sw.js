@@ -1,4 +1,4 @@
-const CACHE = "bayinat-v15";
+const CACHE = "bayinat-v17";
 const SHELL = [
   "./",
   "./index.html",
