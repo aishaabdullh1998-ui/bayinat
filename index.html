@@ -355,6 +355,8 @@
     padding:3px 9px;font-size:11.5px;cursor:pointer;transition:background .2s,color .2s;
   }
   .group-head .all:hover{background:var(--brand-tint);color:var(--brand);}
+  .group-head .all.armed{background:var(--danger-soft);color:var(--danger);font-weight:600;}
+  .surah-chip{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;}
   .surah-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:7px;}
   .surah-chip{
     display:flex;align-items:center;gap:6px;border:1px solid var(--line);
@@ -846,6 +848,7 @@
       localStorage.setItem("bayinat_migrated","1");
 
       /* الطلاب الذين لم يكتمل رفعهم بعد لا يجوز أن تمحوهم نسخة السحابة */
+      const prevList=state.students.slice();
       const pendingIds=new Set(queue.filter(q=>q.op==="up").map(q=>q.id));
       const remoteIds=new Set(data.map(r=>r.id));
       const stillPending=state.students.filter(s=>pendingIds.has(s.id) && !remoteIds.has(s.id));
@@ -857,7 +860,15 @@
         if(!("grade" in r)) s.grade=(prev.get(r.id)||{}).grade||"";
         return s;
       }).concat(stillPending);
-      save(); render();
+      /* لا يُعاد الرسم إن كانت نسخة السحابة مطابقة لما هو معروض (صدى كتابتنا نحن) */
+      const sig=list=>JSON.stringify(list.slice().sort((a,b)=>a.id<b.id?-1:1));
+      const changed = sig(state.students)!==sig(prevList);
+      save();
+      if(changed){
+        const y=window.scrollY;
+        render();
+        window.scrollTo(0,y);
+      }
     }catch(e){}
     updateSync();
   }
@@ -886,6 +897,8 @@
   window.addEventListener("offline",updateSync);
 
   const findS = id => state.students.find(s=>s.id===id);
+  const openCards = new Set();      /* بطاقات قائمتها مفتوحة */
+  const panelScroll = new Map();    /* موضع التمرير داخل كل قائمة */
   /* لا تُحسب إلا مفاتيح السور الرقمية — فحقل الصف يُخزَّن داخل نفس الحقل */
   const surahKeys = s => Object.keys(s.records||{}).filter(k=>/^\d+$/.test(k));
   const doneCount = s => surahKeys(s).length;
@@ -1399,7 +1412,30 @@
             chip.title = r ? (GRADES[g]+(r.date?" · "+fmtDate(r.date):"")+(r.note?" · "+r.note:"")) : "لم يُسمَّع بعد";
           }};
           chipRefs.push(ref); ref.paint();
-          chip.addEventListener("click",()=>reciteDialog(s,item,()=>{ refresh(); paintGroup(); }));
+
+          /* نقرة = تسجيل «ممتاز» بتاريخ اليوم، ونقرة ثانية = إلغاء.
+             ضغطة مطوّلة (أو زر الفأرة الأيمن) = نافذة التفاصيل. */
+          let pressTimer=null, longFired=false, lastToggle=0;
+          const openDetails=()=>{ longFired=true; reciteDialog(s,item,()=>{ refresh(); paintGroup(); renderStats(); renderBoard(); }); };
+          const startPress=()=>{ longFired=false; clearTimeout(pressTimer); pressTimer=setTimeout(openDetails,520); };
+          const cancelPress=()=>{ clearTimeout(pressTimer); };
+          chip.addEventListener("pointerdown",startPress);
+          ["pointerup","pointerleave","pointercancel"].forEach(ev=>chip.addEventListener(ev,cancelPress));
+          chip.addEventListener("contextmenu",e=>{ e.preventDefault(); cancelPress(); openDetails(); });
+          chip.addEventListener("click",()=>{
+            if(longFired){ longFired=false; return; }
+            const now=Date.now();
+            if(now-lastToggle<420) return;   /* يمنع النقر المزدوج العَرَضي */
+            lastToggle=now;
+            if(s.records[item.num]){
+              delete s.records[item.num];
+              toast("أُلغي تسجيل سورة "+item.name);
+            }else{
+              s.records[item.num]={date:todayISO(),grade:1,note:""};
+              toast("سُجّلت سورة "+item.name+" — ممتاز");
+            }
+            persist(s); refresh(); paintGroup(); renderStats(); renderBoard();
+          });
           grid.appendChild(chip);
         });
         scroll.appendChild(grid);
@@ -1409,28 +1445,47 @@
           frac.textContent=ed(d)+"/"+ed(set.length);
           all.textContent = d===set.length ? "إلغاء الكل" : "تحديد الكل";
         }
+        let armTimer=null;
         all.addEventListener("click",()=>{
           const d=set.filter(x=>s.records[x.num]).length;
-          if(d===set.length){ set.forEach(x=>delete s.records[x.num]); toast("أُلغي جزء "+j.name); }
+          const full = d===set.length;
+          /* الضغطة الأولى تطلب تأكيدًا، والثانية خلال ٤ ثوانٍ تنفّذ */
+          if(all.dataset.armed!=="1"){
+            all.dataset.armed="1";
+            all.textContent = full ? "تأكيد إلغاء الجزء؟" : "تأكيد تسجيل "+ed(set.length-d)+" سورة؟";
+            all.classList.add("armed");
+            clearTimeout(armTimer);
+            armTimer=setTimeout(()=>{ all.dataset.armed="0"; all.classList.remove("armed"); paintGroup(); },4000);
+            return;
+          }
+          clearTimeout(armTimer); all.dataset.armed="0"; all.classList.remove("armed");
+          if(full){ set.forEach(x=>delete s.records[x.num]); toast("أُلغي جزء "+j.name); }
           else { set.forEach(x=>{ if(!s.records[x.num]) s.records[x.num]={date:todayISO(),grade:1,note:""}; }); toast("سُجّل جزء "+j.name+" كاملًا"); }
-          persist(s); refresh(); paintGroup(); renderStats();
+          persist(s); refresh(); paintGroup(); renderStats(); renderBoard();
         });
         paintGroup();
         chipRefs.push({paint:paintGroup});
       });
     }
 
-    toggleBtn.addEventListener("click",()=>{
-      if(!built){ buildChips(); built=true; }
-      const open=!panel.classList.contains("open");
-      requestAnimationFrame(()=>{
-        panel.classList.toggle("open",open);
-        toggleBtn.setAttribute("aria-expanded",open?"true":"false");
-      });
-    });
+    function setOpen(open){
+      if(open && !built){ buildChips(); built=true; void panel.offsetHeight; }
+      panel.classList.toggle("open",open);
+      toggleBtn.setAttribute("aria-expanded",open?"true":"false");
+      if(open) openCards.add(s.id); else openCards.delete(s.id);
+    }
+    toggleBtn.addEventListener("click",()=>setOpen(!panel.classList.contains("open")));
+    scroll.addEventListener("scroll",()=>{ panelScroll.set(s.id, scroll.scrollTop); },{passive:true});
 
     card.append(head,meta,progRow,actions,panel);
-    requestAnimationFrame(refresh);
+    setTimeout(refresh,0);
+
+    /* القائمة التي فتحتها المعلمة تبقى مفتوحة حتى تغلقها هي، مهما أُعيد الرسم */
+    if(openCards.has(s.id)){
+      setOpen(true);
+      const st=panelScroll.get(s.id);
+      if(st) setTimeout(()=>{ scroll.scrollTop=st; },0);
+    }
     return card;
   }
 
